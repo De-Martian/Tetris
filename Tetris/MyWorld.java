@@ -22,16 +22,16 @@ public class MyWorld extends World
             //Giant array for all piece rotations
     int[][] levelColors = {{2,1,1,2},{2,9,1,10},{2,4,1,4},{2,10,1,2},{2,11,1,5},{2,2,2,11},{0,0,1,6},{0,5,1,3},{1,6,1,2},{2,7,1,6}};
     game field = new game(); game nums = new game(); game side = new game(); game next = new game();
-    int level; int lines; int score; int frameCounter = 1; int piece; int r = 0; int x = 5; int y = 2; int drop; int das; int gameState = 1;
-    int[] piececounter = new int[7]; int[] dropDelay = {48,43,38,33,28,23,18,13,8,6,5,5,5,4,4,4,3,3,3,2}; int[] top = {10000,7500,5000}; int[][] board = new int[10][22]; int[] Counters = new int[4];
+    int level; int lines; int score; int frameCounter = 1; int piece; int r = 0; int x = 5; int y = 2; int drop = 48; int das; int gameState = 1;
+    int[] piececounter = new int[7]; int[] dropDelay = {48,43,38,33,28,23,18,13,8,6,5,5,5,4,4,4,3,3,3}; int[] top = {10000,7500,5000}; int[][] board = new int[10][22]; int[] Counters = new int[4];
     GreenfootImage[] square = new GreenfootImage[4]; GreenfootImage bg = new GreenfootImage(240,480); GreenfootImage numbers = new GreenfootImage(768,720); GreenfootImage[] digit = new GreenfootImage[10]; GreenfootImage[] digitred = new GreenfootImage[10];
     boolean[] inputs = new boolean[8]; boolean[] lastInputs = new boolean[8]; String[] keys = {"z","x","shift","enter","up","down","left","right"};
-    int timer = 0;
+    int timer = 0; int levelup;
     //declare ALL the variables
     public MyWorld()
     {    
         super(768, 720, 1);
-        level = 0;
+        level = 18;
         lines = 0;
         score = 0;
         addObject(field,408,384);
@@ -39,6 +39,10 @@ public class MyWorld extends World
         nums.setImage(numbers);
         addObject(side,106,435);
         addObject(next,622,382);
+        levelup = level+1;
+        if(level >= 10)
+            levelup = 10+((level+1)&15)*((level+1)>>4);
+        System.out.println(levelup);
         level--;
         incLevel();
         updateNext(7);
@@ -61,7 +65,7 @@ public class MyWorld extends World
         if(diff*6 > (frameCounter+2)*100){
             t = t2-(frameCounter*100/6);
         }
-        if(diff*6 >= frameCounter * 100){//only runs every 1/60 seconds
+        if(diff*6 >= frameCounter * 100){//only runs every 1/60 of a second
             frameCounter++;
             if(gameState == 0){
                 menu();
@@ -80,19 +84,26 @@ public class MyWorld extends World
         }
     }
     int ne = (int)(Math.random()*7);
-    int moveCounter = 0;
+    int moveCounter = 98;
     boolean moveDown = false;
     boolean newPiece = false;
     boolean letGo = true;
+    boolean full = false;
+    int[] line = new int[20];
+    int dropPoints = 0;
     public void inGame(){
         if(timer > 0){
             timer--;
+            if(full && timer < 26)
+                clearLine(26-timer);
         }
         else{
             if(frameCounter == 2 || newPiece){
                 piece = ne;
                 spawnPiece();
-                ne = (int)(Math.random()*7);
+                ne = (int)(Math.random()*8);
+                if(ne == 7 || ne == piece) 
+                    ne = (int)(Math.random()*7);
                 updateNext(ne);
                 newPiece = false;
                 numb();
@@ -100,8 +111,9 @@ public class MyWorld extends World
             }
             if(!inputs[5]){
                 letGo = true;
+                dropPoints = 0;
                 if(inputs[6]){
-                    if(das >= 16 || !lastInputs[6])
+                    if(das >= 16 || das == 0)
                         if(canMove(-1)){
                             move(-1);
                             das = lastInputs[6]? 10:0;
@@ -111,7 +123,7 @@ public class MyWorld extends World
                     das++;
                 }
                 if(inputs[7]){
-                    if(das >= 16 || !lastInputs[7])
+                    if(das >= 16 || das == 0)
                         if(canMove(1)){
                             move(1);
                             das = lastInputs[7]? 10:0;
@@ -127,16 +139,27 @@ public class MyWorld extends World
                 rotate(1);
             if(inputs[1] &&  !lastInputs[1] && canRotate(3))
                 rotate(3);
-            moveCounter++;
-            if((moveCounter >= dropDelay[level]) || (inputs[5] && moveCounter >= 2 && letGo)){
+            moveCounter--;
+            if(inputs[5] && letGo && moveCounter > 1){
+                moveCounter = 1;
+                dropPoints++;
+            }
+            if(moveCounter <= 0){
                 if(canMove(0))
                     move(0);
-                else
+                else{
                     newPiece();
-                moveCounter = 0;
+                    score += dropPoints;
+                }
+                if(level < 20)
+                    moveCounter = dropDelay[level];
+                else if(level < 29)
+                    moveCounter = 2;
+                else
+                    moveCounter = 1;
             }
-            makeboard();
         }
+        makeboard();
     }
     int menuState = 0;
     boolean a = true;
@@ -157,7 +180,6 @@ public class MyWorld extends World
         for(int i = 0; i < 10; i++)
             for(int j = 0; j < 20; j++)
                 bg.drawImage(square[board[i][j+2]%4],i*24,j*24);
-
         field.setImage(bg);
     }
     public void updateNext(int t){
@@ -171,10 +193,31 @@ public class MyWorld extends World
     }
     public void newPiece(){
         newPiece = true;
-        timer = 10 + (y-2)/4;
-        int[] clear = filled();
-        if(clear.length < 0){
-            timer += 20;
+        timer = 17 - (y-2)/4;
+        filled();
+    }
+    public void clearLine(int frame){
+        if(frame%4 == 0)
+            for(int i = 2; i < 22; i++){
+                if(line[i-2] != 0 && frame <= 20){
+                    board[4+frame/4][i] = 0;
+                    board[5-frame/4][i] = 0;
+                }
+                if(line[i-2] != 0 && frame == 24){
+                    moveDown(i);
+                }
+            }
+    }
+    public void moveDown(int lin){
+        for(int i = lin; i > 1; i--)
+            for(int j = 0; j < 10; j++)
+                board[j][i] = i == 2? 0:board[j][i-1];
+        if(lin == 2)
+            line[19] = 1;
+        full = false;
+        if(lines >= levelup*10){
+            levelup++;
+            incLevel();
         }
     }
     public void incLevel(){
@@ -188,25 +231,17 @@ public class MyWorld extends World
             cell.scale(24,24);
         }
         square = cells;
+        drop = (level < 19)? dropDelay[level]:(level<29)? 2:1;
     }
-
     public GreenfootImage coloring(GreenfootImage img){
         for(int i = 0; i < img.getWidth(); i++)
             for(int j = 0; j < img.getHeight(); j++)
-                if(img.getColorAt(i,j).equals(Color.BLUE))
+                if(img.getColorAt(i,j).equals(Color.RED))
                     img.setColorAt(i,j,pallete[levelColors[level%10][0]][levelColors[level%10][1]]);
-                else if(img.getColorAt(i,j).equals(Color.RED))
+                else if(img.getColorAt(i,j).equals(Color.BLUE))
                     img.setColorAt(i,j,pallete[levelColors[level%10][2]][levelColors[level%10][3]]);
         return img;
     }
-    int result = 35208;
-    public void RNG(){
-        int bit1 = (result >> 1) & 1;
-        int bit9 = (result >> 9) & 1;
-        int leftmostBit = bit1 ^ bit9;
-        result = (leftmostBit << 15) | (result >> 1);
-    }
-
     public void drawNumber(int numer, int len, int x, int y){
         int temp = numer;
         for(int i = 0; i < len; i++){
@@ -214,7 +249,6 @@ public class MyWorld extends World
             temp /= 10;
         }
     }
-
     public void numb(){//draws all the numbers on screen
         drawNumber(score,6,696,192);
         drawNumber(top[0],6,696,120);
@@ -302,7 +336,6 @@ public class MyWorld extends World
             board[x+i[0]][y-i[1]] += 3;
         return can;
     }
-
     public void rotate(int dir){
         for(int[] i:rots[piece][r])
             board[x+i[0]][y-i[1]] = 0;
@@ -310,22 +343,22 @@ public class MyWorld extends World
         for(int[] i:rots[piece][r])
             board[x+i[0]][y-i[1]] = piece%3+1;
     }
-    public int[] filled(){
-        int[] rows = new int[20];
+    public void filled(){
+        int[] scores = {0,40,100,300,1200};
         int re = 0;
-        for(int i = 2; i < 22; i++){
-            boolean full = true;
-            for(int j = 0; j < 10; j++)
-                if(board[j][i] == 0)
-                    full = false;
-            if(full){
-                rows[re] = i;
+        for(int i = 21; i > 1; i--){
+            int prod = 1;
+            for(int j = 0; j < 10; j++){
+                prod *= board[j][i];
+            }
+            line[i-2] = prod;
+            if(prod != 0){
+                if(re == 0)
+                    timer += 20;
                 re++;
+                full = true;
             }
         }
-        int[] fill = new int[re];
-        for(int i = 0; i < re; i++)
-            fill[i] = rows[i];
-        return fill;
+        score += scores[re]*(level+1);
     }
 }
